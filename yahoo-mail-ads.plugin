@@ -1,0 +1,16 @@
+#!name = Yahoo! JAPAN 邮件去广告
+#!desc = 0.1.0；依据 iOS 抓包定向拦截信息流广告；需开启 MitM 并信任证书；尚未实机验证。
+#!author = lpleasure
+#!homepage = https://github.com/lpleasure/yahoo-mail-ads-loon
+#!system = iOS,iPadOS
+
+# Exact ad endpoints observed in Yahoo! JAPAN Mail iOS traffic.
+# Shared Yahoo ad endpoints can also affect other Yahoo! JAPAN apps.
+[Rule]
+URL-REGEX,^https://aag\.yahooapis\.jp(?::443)?/v2/ads/elookup(?:\?|$),REJECT
+URL-REGEX,^https://da\.flvcdn\.net(?::443)?/spaces/da-media/objects/,REJECT
+URL-REGEX,^https://apm\.yahoo\.co\.jp(?::443)?/3/(?:m|v)(?:\?|$),REJECT
+URL-REGEX,^https://s\.yimg\.jp(?::443)?/images/adsdk/omsdk/,REJECT
+
+[Mitm]
+hostname = aag.yahooapis.jp, da.flvcdn.net, apm.yahoo.co.jp, s.yimg.jp
