@@ -1,5 +1,5 @@
 #!name = Yahoo! JAPAN 邮件去广告
-#!desc = 0.3.0；去广告＋实验性关闭广告位（hasAds 与广告投放范围）；需 MitM；占位效果待实机验证。
+#!desc = 0.4.0；去广告并关闭广告位（hasAds 与广告投放范围）；无脚本；需 MitM。
 #!author = lpleasure
 #!homepage = https://github.com/lpleasure/yahoo-mail-ads-loon
 #!system = iOS,iPadOS
@@ -7,18 +7,17 @@
 
 # Exact ad endpoints observed in Yahoo! JAPAN Mail iOS traffic.
 # Shared Yahoo ad endpoints can also affect other Yahoo! JAPAN apps.
-[Argument]
-collapse_slots = switch,true,type=boolean,tag=尝试关闭广告占位,desc=实验性修改 hasAds 与广告投放范围，异常时可关闭
-
 [Rule]
 URL-REGEX,^https://aag\.yahooapis\.jp(?::443)?/v2/ads/elookup(?:\?|$),REJECT
 URL-REGEX,^https://da\.flvcdn\.net(?::443)?/spaces/da-media/objects/,REJECT
 URL-REGEX,^https://apm\.yahoo\.co\.jp(?::443)?/3/(?:m|v)(?:\?|$),REJECT
 URL-REGEX,^https://s\.yimg\.jp(?::443)?/images/adsdk/omsdk/,REJECT
 
-[Script]
-response if ${url} ~= /^https:\/\/s\.yimg\.jp(?::443)?\/dl\/ymail\/ios\/ad-farm-v2\.json(?:\?|$)/ && ${response.status} == 200 then script("https://raw.githubusercontent.com/lpleasure/yahoo-mail-ads-loon/main/yahoo-mail-layout.js", {${collapse_slots}}) with requires_body=true, binary_body_mode=false, timeout=5, tag="YahooMail 广告占位"
-response if ${url} ~= /^https:\/\/appcscd\.mail\.yahooapis\.jp(?::443)?\/ws\/v3\/(?:batch|mailboxes\/[^?]*\/attributes)/ && ${response.status} == 200 then script("https://raw.githubusercontent.com/lpleasure/yahoo-mail-ads-loon/main/yahoo-mail-user.js", {${collapse_slots}}) with requires_body=true, binary_body_mode=false, timeout=5, tag="YahooMail 用户属性"
+[Rewrite]
+# userAttributes: hasAds -> false. Escaped \"hasAds\" inside mail content does not match.
+response if ${url} ~= /^https:\/\/appcscd\.mail\.yahooapis\.jp(?::443)?\/ws\/v3\/(?:batch|mailboxes\/[^?]*\/attributes)/ && ${response.status} == 200 then response.body.replace(/"hasAds"\s*:\s*true/, "\"hasAds\":false")
+# ad-farm-v2.json: no mail farm eligible; "8200" is this account's userAttributes.farm.
+response if ${url} ~= /^https:\/\/s\.yimg\.jp(?::443)?\/dl\/ymail\/ios\/ad-farm-v2\.json(?:\?|$)/ then response.body.mock("json", `{"MessageList":{"Farm":[],"NGFarm":["*","8200"]},"FolderList":{"Farm":[],"NGFarm":["*","8200"]},"MessageDetail":{"Farm":[],"NGFarm":["*","8200"]}}`, 200) | response.header.set("Cache-Control", "no-store")
 
 [Mitm]
 hostname = aag.yahooapis.jp, da.flvcdn.net, apm.yahoo.co.jp, s.yimg.jp, appcscd.mail.yahooapis.jp

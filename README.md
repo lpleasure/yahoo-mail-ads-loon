@@ -1,56 +1,57 @@
 # Yahoo! JAPAN Mail Ads for Loon
 
-基于用户提供的 Yahoo! JAPAN 邮件 iOS 抓包制作的定向去广告插件，版本 0.3.0。不是国际版 Yahoo Mail 通用规则。
+基于用户提供的 Yahoo! JAPAN 邮件 iOS 抓包制作的定向去广告插件，版本 0.4.0。不是国际版 Yahoo Mail 通用规则。插件只使用 Loon 内置的规则和 Rewrite，不含 JS 脚本，也没有开关，安装后全部生效。
 
 ## 安装
 
 在 Loon 的插件页面添加：
 https://raw.githubusercontent.com/lpleasure/yahoo-mail-ads-loon/main/yahoo-mail-ads.plugin
 
-开启插件和 MitM，安装并信任 Loon 证书，然后完全退出并重新打开邮件 App。插件保留原生广告拦截，并自动加载本仓库的广告位配置脚本。MitM 包含广告相关主机，以及 0.3.0 起为改写用户属性加入的邮件接口主机 appcscd.mail.yahooapis.jp（见下文），未启用通配符。
+开启插件和 MitM，安装并信任 Loon 证书，然后完全退出并重新打开邮件 App。需要 Loon 3.5.1 (978) 及以上，新版 Rewrite 语法从这个版本开始支持。MitM 只列出下文用到的主机，未启用通配符。
 
 ## 范围
 
-- 广告下发：aag.yahooapis.jp 的 /v2/ads/elookup，抓包中 3 次响应明确包含 native_infeed 广告，返回广告数分别为 6、1、1。
+拦截（[Rule]）：
+
+- 广告下发：aag.yahooapis.jp 的 /v2/ads/elookup。抓包中有 3 次响应明确包含 native_infeed 广告，分别返回 6、1、1 条。
 - 广告素材：da.flvcdn.net 的 /spaces/da-media/objects/。
 - 广告展示统计：apm.yahoo.co.jp 的 /3/m 和 /3/v。
 - 广告展示验证 SDK：s.yimg.jp 的 /images/adsdk/omsdk/。
 
-保留邮件同步、登录、通讯录、推送、主题、紧急通知及普通图片资源。新增实验性广告位配置改写，详见下文。会员推广和服务推荐未纳入此版；不会删除真实邮件中的广告内容。
+关闭广告位（[Rewrite]）：
 
-Loon 规则按请求匹配，不按 App 隔离；其他 Yahoo! JAPAN 应用若使用这些广告接口也会受到影响。
+- 用户属性：appcscd.mail.yahooapis.jp 的 /ws/v3/batch 和 /ws/v3/mailboxes/…/attributes，用 `response.body.replace` 把 `"hasAds":true` 改为 false。邮件正文里转义的 `\"hasAds\"` 匹配不到，不受影响；其他字段原样保留。
+- 广告投放范围：s.yimg.jp/dl/ymail/ios/ad-farm-v2.json，用 `response.body.mock` 直接返回改好的配置：MessageList、FolderList、MessageDetail 三处的 Farm 都为 []，NGFarm 都为 ["*","8200"]，并设置 Cache-Control: no-store。原文件自 2022 年起只有这三处，每处 Farm 为 ["*"]、NGFarm 为 []。
+
+保留邮件同步、登录、通讯录、推送、主题、紧急通知及普通图片资源。会员推广和服务推荐未纳入；不会删除真实邮件中的广告内容。
+
+Loon 规则按请求匹配，不按 App 隔离；其他 Yahoo! JAPAN 应用若使用这些广告接口，也会受到影响。
+
+## 关于 farm 编号 8200
+
+ad-farm-v2.json 的 Farm/NGFarm 按邮件 farm 列出参与或排除广告的账号范围，账号所属的 farm 见 userAttributes 的 `"farm"` 字段，抓包账号为 8200。插件不运行脚本，无法读取账号的 farm，所以把 8200 直接写进配置：Farm 为空，本身已经不选中任何 farm；NGFarm 里的 "*" 和 "8200" 是双重保险。其他账号的 farm 可能不同，可修改插件中的这个数字。
 
 ## 验证及限制
 
-在本地对原始抓包离线匹配：四条规则分别命中 3、6、8、5 个请求；7 个邮件同步/登录/通讯录/推送请求未命中；4 个非目标路径及主机边界样例通过。
+- 拦截规则在本地对原始抓包离线匹配：四条规则分别命中 3、6、8、5 个请求；7 个邮件同步、登录、通讯录、推送请求未命中；4 个非目标路径及主机边界样例也都没有误伤。
+- Rewrite 用 rewrite.test.cjs 在本地按插件中的原文检验：URL 条件、替换效果和 Mock 内容是否为合法 JSON。Node 与 Loon 的正则引擎可能有细微差异，但所用写法都是基础语法。
+- 字段含义是根据抓包推断的。App 是否据此不再创建广告位，尚未在 iPhone 上验证。
 
-以上只验证请求范围，不代表已在 iPhone 上验证页面效果。广告空白位、已缓存素材和其他广告来源可能仍保留；拒绝请求也可能触发客户端重试。开启后检查收发邮件、图片和通知。如有异常，停用插件后重新打开 App。不要清空邮件数据或卸载 App。
+更新插件后，完全退出邮件 App 再打开，并下拉刷新收件箱一次。App 可能缓存旧属性和配置，可能要多重启几次。仍留白时，需要在开启插件的状态下，从冷启动开始重新抓包。
 
-若规则没有命中，检查 MitM 是否生效以及本地优先放行规则。不要把整个 yahooapis.jp 或 s.yimg.jp 加入拒绝规则。
+如有异常，停用插件后重新打开 App。不要清空邮件数据或卸载 App。若规则没有命中，检查 MitM 是否生效以及本地优先放行规则。不要把整个 yahooapis.jp 或 s.yimg.jp 加入拒绝规则。
+
+测试：node rewrite.test.cjs
 
 ## 隐私
 
-仓库仅包含插件、脚本、合成测试和说明。原始 HAR、账号、Cookie、授权令牌、邮件、设备标识和广告跟踪查询参数均不上传。后续反馈只需脱敏的主机、路径和规则命中情况。
+仓库只包含插件、合成测试和说明。原始 HAR、账号、Cookie、授权令牌、邮件、设备标识和广告跟踪查询参数均不上传。appcscd.mail.yahooapis.jp 是邮件接口主机，加入 MitM 后由 Loon 在本机解密，插件只做上述一处文本替换，不读取、不上传邮件内容。
 
-Loon 官方 URL 规则文档：https://nsloon.app/docs/Rule/http_rule/
+Loon 官方文档：URL 规则 https://nsloon.app/docs/Rule/http_rule/ ，Rewrite https://nsloon.app/docs/Rewrite/rewrite_v2
 
-## 0.2.0：尝试关闭广告占位（实验）
+## 更新记录
 
-用户截图确认 0.1.0 拦截后出现“広告取得に失敗しました”，广告容器仍在。新增响应脚本只匹配 s.yimg.jp/dl/ymail/ios/ad-farm-v2.json；参考此前抓包中已读出的结构，将 MessageList、FolderList、MessageDetail 的 Farm 改为 []，NGFarm 改为 ["*"]，尝试阻止广告位参与投放。字段含义与通配符行为属于推断，尚未验证客户端是否据此折叠容器；不能承诺已解决空白。没有修改会员资格或邮件接口。
-
-更新 Loon 中已有插件和脚本，确认描述为 0.2.0，并保持“尝试关闭广告占位”开启。完全退出再打开邮件 App，等待它重新请求该配置。日志出现 [YahooMail] layout_config_modified version=0.2.0 只代表配置已改写，不代表界面已折叠。若没有日志，可能尚未重新请求配置或未解密成功；不要清空邮件数据。若改写后仍留白，需要新抓包进一步查找布局开关，或可能由客户端固定布局决定。关闭开关可恢复原响应，App 内已有配置缓存需等待重新获取。
-
-安全回退：只处理 HTTP 200、有效 JSON 和三个预期配置对象；结构不符、错误或超限时原样放行，保留其他字段。移除改写响应的长度、压缩、验证及缓存头，设置 no-store。测试命令：node layout.test.cjs。测试覆盖三个投放区域、其他字段保留、响应头、幂等性、12 个原样放行情形和查询参数。原 HAR 当前已不在原路径，此次使用上次读取结构构造合成测试，未重新回放 HAR，也未实机验证。
-
-## 0.3.0：关闭 hasAds，并按账号 farm 排除投放（实验）
-
-用户截图（收件箱列表和文件夹页）仍显示“広告取得に失敗しました”占位。抓包中 appcscd.mail.yahooapis.jp 的 userAttributes 含 `"farm":8200` 和 `"hasAds":true`；公开的 s.yimg.jp/dl/ymail/ios/ad-farm-v2.json 以 Farm/NGFarm 列出参与/排除广告的邮件 farm。推断 App 依据这两项决定是否创建广告位。
-
-- 新增 yahoo-mail-user.js：只匹配 appcscd.mail.yahooapis.jp 的 /ws/v3/batch 和 /ws/v3/mailboxes/…/attributes，把 `"hasAds":true` 改为 false，并把 farm 编号存入 Loon 持久化存储。邮件正文中转义的 `\"hasAds\"` 不受影响，其他字段原样保留。
-- yahoo-mail-layout.js：NGFarm 除 "*" 外再加入已保存的 farm 编号（如 ["*","8200"]），不依赖通配符。
-- MitM 新增 appcscd.mail.yahooapis.jp。这是邮件接口主机，脚本只做上述文本替换，不读取或上传邮件内容。
-- 两个改写都受“尝试关闭广告占位”开关控制，关闭即恢复原响应。
-
-更新插件后，完全退出邮件 App 再打开，最好下拉刷新收件箱一次。日志应出现 `[YahooMail] user_attributes_modified version=0.3.0 farm=…` 和 `[YahooMail] layout_config_modified version=0.3.0 ng=*,…`。第一次运行时，配置可能早于用户属性请求，此时 ng 只有 "*"，再重启一次 App 即可。App 可能缓存旧属性，占位消失前可能要多重启几次。日志正常但仍留白时，需要新抓包（开启插件状态下，从冷启动开始）。
-
-测试：node layout.test.cjs && node user.test.cjs。另用线上 ad-farm-v2.json 离线运行脚本，结果符合预期。未实机验证。
+- 0.4.0：改为 Loon 内置 Rewrite 实现，删除 JS 脚本和“尝试关闭广告占位”开关，改写默认生效。
+- 0.3.0：用脚本改写 hasAds，并按账号 farm 排除投放。
+- 0.2.0：用脚本改写 ad-farm-v2.json，尝试关闭广告位；实机截图仍显示“広告取得に失敗しました”占位。
+- 0.1.0：拦截广告下发、素材、统计和 SDK。
