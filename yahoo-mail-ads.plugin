@@ -1,16 +1,23 @@
 #!name = Yahoo! JAPAN 邮件去广告
-#!desc = 0.1.0；依据 iOS 抓包定向拦截信息流广告；需开启 MitM 并信任证书；尚未实机验证。
+#!desc = 0.2.0；去广告＋实验性关闭广告位；需 MitM；占位效果待实机验证。
 #!author = lpleasure
 #!homepage = https://github.com/lpleasure/yahoo-mail-ads-loon
 #!system = iOS,iPadOS
+#!loon_version = 3.5.1(983)
 
 # Exact ad endpoints observed in Yahoo! JAPAN Mail iOS traffic.
 # Shared Yahoo ad endpoints can also affect other Yahoo! JAPAN apps.
+[Argument]
+collapse_slots = switch,true,type=boolean,tag=尝试关闭广告占位,desc=实验性修改广告投放范围，异常时可关闭
+
 [Rule]
 URL-REGEX,^https://aag\.yahooapis\.jp(?::443)?/v2/ads/elookup(?:\?|$),REJECT
 URL-REGEX,^https://da\.flvcdn\.net(?::443)?/spaces/da-media/objects/,REJECT
 URL-REGEX,^https://apm\.yahoo\.co\.jp(?::443)?/3/(?:m|v)(?:\?|$),REJECT
 URL-REGEX,^https://s\.yimg\.jp(?::443)?/images/adsdk/omsdk/,REJECT
+
+[Script]
+response if ${url} ~= /^https:\/\/s\.yimg\.jp(?::443)?\/dl\/ymail\/ios\/ad-farm-v2\.json(?:\?|$)/ && ${response.status} == 200 then script("https://raw.githubusercontent.com/lpleasure/yahoo-mail-ads-loon/main/yahoo-mail-layout.js", {${collapse_slots}}) with requires_body=true, binary_body_mode=false, timeout=5, tag="YahooMail 广告占位"
 
 [Mitm]
 hostname = aag.yahooapis.jp, da.flvcdn.net, apm.yahoo.co.jp, s.yimg.jp
