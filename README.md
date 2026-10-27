@@ -34,18 +34,16 @@ ad-farm-v2.json 的 Farm/NGFarm 按邮件 farm 列出参与或排除广告的账
 ## 验证及限制
 
 - 拦截规则在本地对原始抓包离线匹配：四条规则分别命中 3、6、8、5 个请求；7 个邮件同步、登录、通讯录、推送请求未命中；4 个非目标路径及主机边界样例也都没有误伤。
-- Rewrite 用 rewrite.test.cjs 在本地按插件中的原文检验：URL 条件、替换效果和 Mock 内容是否为合法 JSON。Node 与 Loon 的正则引擎可能有细微差异，但所用写法都是基础语法。
+- 0.4.0 发布前曾在本地按插件原文检验 Rewrite（测试脚本未保留在仓库）：URL 条件、替换效果和 Mock 内容是否为合法 JSON。Node 与 Loon 的正则引擎可能有细微差异，但所用写法都是基础语法。
 - 字段含义是根据抓包推断的。App 是否据此不再创建广告位，尚未在 iPhone 上验证。
 
 更新插件后，完全退出邮件 App 再打开，并下拉刷新收件箱一次。App 可能缓存旧属性和配置，可能要多重启几次。仍留白时，需要在开启插件的状态下，从冷启动开始重新抓包。
 
 如有异常，停用插件后重新打开 App。不要清空邮件数据或卸载 App。若规则没有命中，检查 MitM 是否生效以及本地优先放行规则。不要把整个 yahooapis.jp 或 s.yimg.jp 加入拒绝规则。
 
-测试：node rewrite.test.cjs
-
 ## 隐私
 
-仓库只包含插件、合成测试和说明。原始 HAR、账号、Cookie、授权令牌、邮件、设备标识和广告跟踪查询参数均不上传。appcscd.mail.yahooapis.jp 是邮件接口主机，加入 MitM 后由 Loon 在本机解密，插件只做上述一处文本替换，不读取、不上传邮件内容。
+仓库只包含插件和说明。原始 HAR、账号、Cookie、授权令牌、邮件、设备标识和广告跟踪查询参数均不上传。appcscd.mail.yahooapis.jp 是邮件接口主机，加入 MitM 后由 Loon 在本机解密，插件只做上述一处文本替换，不读取、不上传邮件内容。
 
 Loon 官方文档：URL 规则 https://nsloon.app/docs/Rule/http_rule/ ，Rewrite https://nsloon.app/docs/Rewrite/rewrite_v2
 
