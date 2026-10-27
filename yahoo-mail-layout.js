@@ -1,4 +1,4 @@
-/* Yahoo! JAPAN Mail ad placement experiment, 0.2.0. */
+/* Yahoo! JAPAN Mail ad placement experiment, 0.3.0. */
 (function () {
   "use strict";
   var result = {};
@@ -17,16 +17,19 @@
       console.log("[YahooMail] layout_config_skipped");
       return $done({});
     }
-    // Hypothesis: Farm selects eligible mail farms; NGFarm excludes them.
-    // Client-side wildcard and empty-list behavior require device verification.
-    names.forEach(function (name) { data[name].Farm = []; data[name].NGFarm = ["*"]; });
+    // Farm/NGFarm list mail farms (userAttributes.farm, e.g. 8200) eligible / excluded for ads.
+    // The wildcard may not apply to NGFarm, so also list the farm saved by yahoo-mail-user.js.
+    var ng = ["*"];
+    var farm = typeof $persistentStore === "undefined" ? null : $persistentStore.read("yahoo_mail_farm");
+    if (farm && /^\d+$/.test(farm)) ng.push(farm);
+    names.forEach(function (name) { data[name].Farm = []; data[name].NGFarm = ng.slice(); });
     var headers = {};
     Object.keys($response.headers || {}).forEach(function (key) {
       if (!/^(content-length|content-encoding|etag|last-modified|expires|cache-control|content-md5|digest)$/i.test(key)) headers[key] = $response.headers[key];
     });
     headers["Cache-Control"] = "no-store";
     result = {body: JSON.stringify(data), headers: headers};
-    console.log("[YahooMail] layout_config_modified version=0.2.0");
+    console.log("[YahooMail] layout_config_modified version=0.3.0 ng=" + ng.join(","));
   } catch (_) { console.log("[YahooMail] layout_config_skipped"); }
   $done(result);
 })();

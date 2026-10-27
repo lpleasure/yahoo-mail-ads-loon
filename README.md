@@ -1,13 +1,13 @@
 # Yahoo! JAPAN Mail Ads for Loon
 
-基于用户提供的 Yahoo! JAPAN 邮件 iOS 抓包制作的定向去广告插件，版本 0.2.0。不是国际版 Yahoo Mail 通用规则。
+基于用户提供的 Yahoo! JAPAN 邮件 iOS 抓包制作的定向去广告插件，版本 0.3.0。不是国际版 Yahoo Mail 通用规则。
 
 ## 安装
 
 在 Loon 的插件页面添加：
 https://raw.githubusercontent.com/lpleasure/yahoo-mail-ads-loon/main/yahoo-mail-ads.plugin
 
-开启插件和 MitM，安装并信任 Loon 证书，然后完全退出并重新打开邮件 App。插件保留原生广告拦截，并自动加载本仓库的广告位配置脚本。仅广告相关主机列入 MitM，未启用通配符。
+开启插件和 MitM，安装并信任 Loon 证书，然后完全退出并重新打开邮件 App。插件保留原生广告拦截，并自动加载本仓库的广告位配置脚本。MitM 包含广告相关主机，以及 0.3.0 起为改写用户属性加入的邮件接口主机 appcscd.mail.yahooapis.jp（见下文），未启用通配符。
 
 ## 范围
 
@@ -41,3 +41,16 @@ Loon 官方 URL 规则文档：https://nsloon.app/docs/Rule/http_rule/
 更新 Loon 中已有插件和脚本，确认描述为 0.2.0，并保持“尝试关闭广告占位”开启。完全退出再打开邮件 App，等待它重新请求该配置。日志出现 [YahooMail] layout_config_modified version=0.2.0 只代表配置已改写，不代表界面已折叠。若没有日志，可能尚未重新请求配置或未解密成功；不要清空邮件数据。若改写后仍留白，需要新抓包进一步查找布局开关，或可能由客户端固定布局决定。关闭开关可恢复原响应，App 内已有配置缓存需等待重新获取。
 
 安全回退：只处理 HTTP 200、有效 JSON 和三个预期配置对象；结构不符、错误或超限时原样放行，保留其他字段。移除改写响应的长度、压缩、验证及缓存头，设置 no-store。测试命令：node layout.test.cjs。测试覆盖三个投放区域、其他字段保留、响应头、幂等性、12 个原样放行情形和查询参数。原 HAR 当前已不在原路径，此次使用上次读取结构构造合成测试，未重新回放 HAR，也未实机验证。
+
+## 0.3.0：关闭 hasAds，并按账号 farm 排除投放（实验）
+
+用户截图（收件箱列表和文件夹页）仍显示“広告取得に失敗しました”占位。抓包中 appcscd.mail.yahooapis.jp 的 userAttributes 含 `"farm":8200` 和 `"hasAds":true`；公开的 s.yimg.jp/dl/ymail/ios/ad-farm-v2.json 以 Farm/NGFarm 列出参与/排除广告的邮件 farm。推断 App 依据这两项决定是否创建广告位。
+
+- 新增 yahoo-mail-user.js：只匹配 appcscd.mail.yahooapis.jp 的 /ws/v3/batch 和 /ws/v3/mailboxes/…/attributes，把 `"hasAds":true` 改为 false，并把 farm 编号存入 Loon 持久化存储。邮件正文中转义的 `\"hasAds\"` 不受影响，其他字段原样保留。
+- yahoo-mail-layout.js：NGFarm 除 "*" 外再加入已保存的 farm 编号（如 ["*","8200"]），不依赖通配符。
+- MitM 新增 appcscd.mail.yahooapis.jp。这是邮件接口主机，脚本只做上述文本替换，不读取或上传邮件内容。
+- 两个改写都受“尝试关闭广告占位”开关控制，关闭即恢复原响应。
+
+更新插件后，完全退出邮件 App 再打开，最好下拉刷新收件箱一次。日志应出现 `[YahooMail] user_attributes_modified version=0.3.0 farm=…` 和 `[YahooMail] layout_config_modified version=0.3.0 ng=*,…`。第一次运行时，配置可能早于用户属性请求，此时 ng 只有 "*"，再重启一次 App 即可。App 可能缓存旧属性，占位消失前可能要多重启几次。日志正常但仍留白时，需要新抓包（开启插件状态下，从冷启动开始）。
+
+测试：node layout.test.cjs && node user.test.cjs。另用线上 ad-farm-v2.json 离线运行脚本，结果符合预期。未实机验证。
