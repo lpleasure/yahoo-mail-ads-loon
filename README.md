@@ -1,13 +1,13 @@
 # Yahoo! JAPAN Mail Ads for Loon
 
-基于用户提供的 Yahoo! JAPAN 邮件 iOS 抓包制作的定向去广告插件，版本 0.1.0。不是国际版 Yahoo Mail 通用规则。
+基于用户提供的 Yahoo! JAPAN 邮件 iOS 抓包制作的定向去广告插件，版本 0.2.0。不是国际版 Yahoo Mail 通用规则。
 
 ## 安装
 
 在 Loon 的插件页面添加：
 https://raw.githubusercontent.com/lpleasure/yahoo-mail-ads-loon/main/yahoo-mail-ads.plugin
 
-开启插件和 MitM，安装并信任 Loon 证书，然后完全退出并重新打开邮件 App。插件使用原生 URL 规则，无需额外 JavaScript。仅广告相关主机列入 MitM，未启用通配符。
+开启插件和 MitM，安装并信任 Loon 证书，然后完全退出并重新打开邮件 App。插件保留原生广告拦截，并自动加载本仓库的广告位配置脚本。仅广告相关主机列入 MitM，未启用通配符。
 
 ## 范围
 
@@ -16,7 +16,7 @@ https://raw.githubusercontent.com/lpleasure/yahoo-mail-ads-loon/main/yahoo-mail-
 - 广告展示统计：apm.yahoo.co.jp 的 /3/m 和 /3/v。
 - 广告展示验证 SDK：s.yimg.jp 的 /images/adsdk/omsdk/。
 
-保留邮件同步、登录、通讯录、推送、主题、紧急通知及普通图片资源。未改写广告配置 ad-farm-v2.json，因为空 Farm/NGFarm 的客户端语义未经验证。会员推广和服务推荐未纳入此版；不会删除真实邮件中的广告内容。
+保留邮件同步、登录、通讯录、推送、主题、紧急通知及普通图片资源。新增实验性广告位配置改写，详见下文。会员推广和服务推荐未纳入此版；不会删除真实邮件中的广告内容。
 
 Loon 规则按请求匹配，不按 App 隔离；其他 Yahoo! JAPAN 应用若使用这些广告接口也会受到影响。
 
@@ -30,6 +30,14 @@ Loon 规则按请求匹配，不按 App 隔离；其他 Yahoo! JAPAN 应用若�
 
 ## 隐私
 
-仓库只包含插件和说明。原始 HAR、账号、Cookie、授权令牌、邮件、设备标识和广告跟踪查询参数均不上传。后续反馈只需脱敏的主机、路径和规则命中情况。
+仓库仅包含插件、脚本、合成测试和说明。原始 HAR、账号、Cookie、授权令牌、邮件、设备标识和广告跟踪查询参数均不上传。后续反馈只需脱敏的主机、路径和规则命中情况。
 
 Loon 官方 URL 规则文档：https://nsloon.app/docs/Rule/http_rule/
+
+## 0.2.0：尝试关闭广告占位（实验）
+
+用户截图确认 0.1.0 拦截后出现“広告取得に失敗しました”，广告容器仍在。新增响应脚本只匹配 s.yimg.jp/dl/ymail/ios/ad-farm-v2.json；参考此前抓包中已读出的结构，将 MessageList、FolderList、MessageDetail 的 Farm 改为 []，NGFarm 改为 ["*"]，尝试阻止广告位参与投放。字段含义与通配符行为属于推断，尚未验证客户端是否据此折叠容器；不能承诺已解决空白。没有修改会员资格或邮件接口。
+
+更新 Loon 中已有插件和脚本，确认描述为 0.2.0，并保持“尝试关闭广告占位”开启。完全退出再打开邮件 App，等待它重新请求该配置。日志出现 [YahooMail] layout_config_modified version=0.2.0 只代表配置已改写，不代表界面已折叠。若没有日志，可能尚未重新请求配置或未解密成功；不要清空邮件数据。若改写后仍留白，需要新抓包进一步查找布局开关，或可能由客户端固定布局决定。关闭开关可恢复原响应，App 内已有配置缓存需等待重新获取。
+
+安全回退：只处理 HTTP 200、有效 JSON 和三个预期配置对象；结构不符、错误或超限时原样放行，保留其他字段。移除改写响应的长度、压缩、验证及缓存头，设置 no-store。测试命令：node layout.test.cjs。测试覆盖三个投放区域、其他字段保留、响应头、幂等性、12 个原样放行情形和查询参数。原 HAR 当前已不在原路径，此次使用上次读取结构构造合成测试，未重新回放 HAR，也未实机验证。
